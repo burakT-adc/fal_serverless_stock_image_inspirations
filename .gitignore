@@ -63,3 +63,9 @@ test_output/
 fal_credentials.json
 deployment_error.log
 
+# Google Cloud credentials (DO NOT COMMIT)
+google_cloud_credentials/
+*.json
+!package.json
+!tsconfig.json
+
