@@ -1,258 +1,355 @@
-# FAL.ai Serverless Deployment for Stock Image Inspirations
+# FAL.ai Serverless - Stock Image Inspirations
 
-This folder contains the necessary files to deploy your Stock Image Inspirations generator on the [FAL.ai Serverless](https://docs.fal.ai/serverless) platform.
+Transform your stock images with AI-powered fixed inspirations using FAL.ai Serverless platform.
 
-## 🎯 What is Stock Image Inspirations?
+## 🎯 What is This?
 
-This serverless function generates creative, customized inspiration prompts for stock image generation. It analyzes user requirements and generates detailed, optimized prompts that can be used with AI image generation models.
+This serverless function applies **fixed inspirations** to stock images using FAL AI models (like [Nano Banana](https://fal.ai/models/fal-ai/nano-banana/edit)). Instead of manually crafting prompts, you select from pre-configured inspirations that automatically transform your images.
 
-## 🎯 Why FAL Serverless?
+### Available Inspirations
 
-### Advantages
+| Inspiration | Description | Input | Output |
+|------------|-------------|-------|--------|
+| **variations** | Generate multiple variations with different styles | 1 image | 4 images |
+| **change_pose** | Change subject pose while maintaining identity | 1 image | 3 images |
+| **fuse_images** | Combine multiple images into cohesive composition | 2-5 images | 2 images |
+| **marketplace_pure** | Clean marketplace product photography (white bg) | 1 image | 3 images |
+| **marketplace_lifestyle** | Lifestyle marketplace photography with context | 1 image | 3 images |
+| **style_transfer** | Apply different artistic/photographic styles | 1 image | 4 images |
+| **background_change** | Replace background while keeping subject | 1 image | 3 images |
+| **upscale_enhance** | Upscale resolution and enhance quality | 1 image | 1 image |
+| **seasonal_variants** | Create seasonal variations (spring/summer/fall/winter) | 1 image | 4 images |
+| **time_of_day** | Different time of day lighting variations | 1 image | 4 images |
 
-1. **⚡ Instant Scaling**: Instantly scales from 0 to 1000+ instances
-2. **💰 Cost Optimization**: Pay only for the compute you use
-3. **🚀 High Availability**: High availability with auto-scaling
-4. **📊 Full Observability**: Request/response/latency monitoring
-5. **🔧 Customization**: You can control your own logic
-6. **🌐 Global Infrastructure**: Fast response times globally
+## 🚀 Quick Start
 
-## 📦 Installation
-
-### 1. FAL CLI Installation
+### 1. Install Dependencies
 
 ```bash
 pip install fal-client[cli]
 ```
 
-### 2. Authentication
+### 2. Deploy to FAL.ai
 
 ```bash
+# Login to FAL
 fal auth login
-```
 
-This command will open a browser and ask you to log in to FAL.ai.
-
-### 3. Setting up Secrets
-
-Save the environment variables to be used in FAL serverless as secrets:
-
-```bash
-# OpenAI API Key (for inspiration generation)
-fal secrets set OPENAI_API_KEY="sk-..."
-```
-
-## 🚀 Deployment
-
-### Automatic Deployment
-
-```bash
-cd /Users/burak/Desktop/repos/fal_serverless_stock_image_inspirations
-chmod +x deploy.sh
-./deploy.sh
-```
-
-### Manual Deployment
-
-```bash
-cd /Users/burak/Desktop/repos/fal_serverless_stock_image_inspirations
+# Deploy
 fal deploy stock_inspirations_app.py
+
+# You'll get an endpoint like:
+# fal-ai/your-username/stock-image-inspirations
 ```
 
-After deployment is complete, you will get your endpoint URL:
-```
-fal-ai/<your-username>/stock-image-inspirations
-```
-
-## 🔧 Integration with Your Existing Code
-
-### Client Usage Example
+### 3. Use the Service
 
 ```python
 from stock_inspirations_fal_client import StockImageInspirationsFalServerless
 
-# Initialize client
-client = StockImageInspirationsFalServerless(
-    endpoint="fal-ai/your-username/stock-image-inspirations"
+client = StockImageInspirationsFalServerless()
+
+# Apply "variations" inspiration
+result = await client.apply_inspiration(
+    inspiration_type="variations",
+    image_urls=["https://example.com/your-image.jpg"]
 )
 
-# Generate inspirations
-result = await client.generate_inspirations(
-    user_prompt="lifestyle photography for a tech startup",
-    style_preferences=["modern", "minimalist", "professional"],
-    num_inspirations=5,
-    include_keywords=True
+# Get generated images
+for img in result["images"]:
+    print(f"Generated: {img['url']}")
+```
+
+## 📖 Usage Examples
+
+### Marketplace Pure (Product Photography)
+
+```python
+result = await client.apply_inspiration(
+    inspiration_type="marketplace_pure",
+    image_urls=["https://example.com/product.jpg"]
+)
+# Transforms to clean white background product shot
+```
+
+### Marketplace Lifestyle
+
+```python
+result = await client.apply_inspiration(
+    inspiration_type="marketplace_lifestyle",
+    image_urls=["https://example.com/product.jpg"],
+    custom_params={"lifestyle_context": "modern home interior setting"}
+)
+# Adds lifestyle context to product
+```
+
+### Change Pose
+
+```python
+result = await client.apply_inspiration(
+    inspiration_type="change_pose",
+    image_urls=["https://example.com/person.jpg"],
+    custom_params={"pose_option": "professional portrait pose"}
+)
+# Changes person's pose
+```
+
+### Fuse Multiple Images
+
+```python
+result = await client.apply_inspiration(
+    inspiration_type="fuse_images",
+    image_urls=[
+        "https://example.com/image1.jpg",
+        "https://example.com/image2.jpg"
+    ],
+    custom_params={"fusion_style": "seamless integration with unified lighting"}
+)
+# Combines images into one composition
+```
+
+### Style Transfer
+
+```python
+result = await client.apply_inspiration(
+    inspiration_type="style_transfer",
+    image_urls=["https://example.com/photo.jpg"],
+    custom_params={"style_type": "cinematic film photography"}
+)
+# Applies cinematic style
+```
+
+## 🎨 Customization
+
+Each inspiration supports custom parameters:
+
+```python
+# Variations with custom count
+result = await client.apply_inspiration(
+    inspiration_type="variations",
+    image_urls=["https://example.com/image.jpg"],
+    custom_params={"num_variations": 6}
 )
 
-print(result["inspirations"])
+# Seasonal with specific season
+result = await client.apply_inspiration(
+    inspiration_type="seasonal_variants",
+    image_urls=["https://example.com/image.jpg"],
+    custom_params={"season": "winter"}
+)
+
+# Time of day with specific time
+result = await client.apply_inspiration(
+    inspiration_type="time_of_day",
+    image_urls=["https://example.com/image.jpg"],
+    custom_params={"time_of_day": "golden_hour"}
+)
 ```
 
-### Environment Variables
+## 🏗️ Architecture
 
-**Add to your docker-compose.yml or .env file:**
-
-```yaml
-environment:
-  # To use FAL Serverless
-  - FAL_SERVERLESS_INSPIRATIONS_ENDPOINT=fal-ai/your-username/stock-image-inspirations
-  
-  # API Keys (also required on FAL serverless side)
-  - OPENAI_API_KEY=sk-...
-  - FAL_API_KEY=your-fal-key
+```
+Your App → FAL Serverless Endpoint → Fixed Inspiration Logic → FAL Model (Nano Banana) → Generated Images
 ```
 
-## 📊 Monitoring & Management
+### How It Works
 
-### List Deployments
+1. **You call** the serverless endpoint with inspiration type + images
+2. **Endpoint loads** the fixed inspiration configuration
+3. **Configuration defines**:
+   - Which FAL model to use (e.g., nano-banana/edit)
+   - Prompt template
+   - Default parameters
+   - Input/output requirements
+4. **Endpoint calls** the FAL model with optimized parameters
+5. **You receive** generated images
 
-```bash
-fal apps list
-```
+## 📦 Installation & Setup
 
-### View Logs
-
-```bash
-fal logs <app-id>
-```
-
-### Performance Metrics
-
-You can monitor the following metrics from the FAL dashboard:
-- Request latency
-- Success/error rates
-- Cost per request
-
-## 🎛️ Configuration Options
-
-### Machine Types
-
-For this CPU-based application (no GPU needed):
-- `XS` - Minimal resources (0.25 vCPU, 0.5 GB RAM)
-- `S` - Small (0.5 vCPU, 1 GB RAM)
-- `M` - Medium (1 vCPU, 2 GB RAM) **[Recommended]**
-- `L` - Large (2 vCPU, 4 GB RAM)
-
-**Keep Alive:**
-- `0`: Cold start on every request (cheap but slow)
-- `300` (5 min): Moderate warm time
-- `3600` (1 hour): Always ready (expensive but fast)
-
-**Max Concurrency:**
-- Maximum number of requests that can be processed simultaneously
-- Automatically increased with auto-scaling
-
-## 🧪 Testing
-
-### Local Test
+### Option 1: Quick Setup (Recommended)
 
 ```bash
 cd /Users/burak/Desktop/repos/fal_serverless_stock_image_inspirations
-python test_local.py
+./setup_and_deploy.sh
 ```
 
-### Remote Test (After deployment)
+### Option 2: Manual Setup
+
+```bash
+# 1. Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Login to FAL
+fal auth login
+
+# 4. Deploy
+./deploy.sh
+```
+
+## 🔧 Configuration
+
+All inspirations are configured in `inspirations_config.py`:
 
 ```python
-import fal_client
-
-# Call endpoint
-result = fal_client.subscribe(
-    "fal-ai/your-username/stock-image-inspirations",
-    arguments={
-        "user_prompt": "business meeting in a modern office",
-        "style_preferences": ["corporate", "professional", "bright"],
-        "num_inspirations": 3,
-        "include_keywords": True,
-        "include_negative_prompts": True
+INSPIRATIONS_CONFIG = {
+    "variations": {
+        "name": "Variations",
+        "description": "Generate multiple variations...",
+        "fal_endpoint": "fal-ai/nano-banana/edit",
+        "input_type": InputType.OPTIONAL_MULTI,
+        "default_params": {
+            "num_images": 4,
+            "output_format": "png"
+        },
+        "prompt_template": "create {num_variations} professional variations...",
+        "min_input_images": 1,
+        "max_input_images": 5
     },
-    with_logs=True,
-)
-
-print(f"Generated inspirations: {len(result['inspirations'])}")
-for i, inspiration in enumerate(result['inspirations'], 1):
-    print(f"\n{i}. {inspiration['title']}")
-    print(f"   Prompt: {inspiration['prompt']}")
-    print(f"   Keywords: {', '.join(inspiration['keywords'])}")
+    # ... more inspirations
+}
 ```
 
-## 💰 Cost Estimation
+### Adding New Inspirations
 
-FAL Serverless pricing for CPU instances (approximate):
-- **M (Medium)**: ~$0.0001/sec
-- **Keep alive cost**: Machine cost × keep_alive_duration
+1. Add config to `inspirations_config.py`
+2. Define prompt template
+3. Set FAL endpoint
+4. Configure parameters
+5. Deploy: `fal deploy stock_inspirations_app.py`
 
-**Example Calculation:**
-- Average processing time: 2 seconds
-- Machine: M (Medium)
-- Keep alive: 300 seconds (5 minutes)
-- Request frequency: 10 requests/minute
+## 💰 Pricing
 
-**Cost:**
-- Per request: 2 × $0.0001 = $0.0002
-- **Total: ~$0.0002/request**
+- **FAL Serverless**: ~$0.0001/sec (CPU instance, M size)
+- **Nano Banana**: ~$0.039 per output image ([source](https://fal.ai/models/fal-ai/nano-banana/edit))
 
-**Comparison:**
-- Dedicated server: ~$50/month = ~$1.67/day
-- FAL Serverless (1000 requests/day): ~$0.20/day
+**Example Cost:**
+- 1 request with 4 output images: ~$0.156
+- Processing time: ~3 seconds
+- Total: ~$0.156 per request
 
-💡 **90% cost savings!**
+## 📊 Response Format
 
-## 🔄 Migration Checklist
+```json
+{
+  "images": [
+    {"url": "https://...", "index": 0},
+    {"url": "https://...", "index": 1}
+  ],
+  "inspiration_type": "variations",
+  "inspiration_name": "Variations",
+  "prompt_used": "create 4 professional variations...",
+  "fal_endpoint": "fal-ai/nano-banana/edit",
+  "input_image_count": 1,
+  "output_image_count": 4,
+  "processing_time": 3.45,
+  "request_id": "uuid-here",
+  "success": true,
+  "warnings": null
+}
+```
 
-- [ ] FAL CLI installation
-- [ ] FAL auth login
-- [ ] Set up secrets (OPENAI_API_KEY)
-- [ ] Deploy `stock_inspirations_app.py`
-- [ ] Get endpoint URL
-- [ ] Set `FAL_SERVERLESS_INSPIRATIONS_ENDPOINT` env variable
-- [ ] Send test request
-- [ ] Move to production
-- [ ] Set up monitoring
-- [ ] Activate cost tracking
+## 🧪 Testing
 
-## 🐛 Troubleshooting
-
-### "fal auth" error
 ```bash
-# Re-authenticate
-fal auth logout
-fal auth auth login
+# Test specific inspirations
+python test_local.py
+
+# Run examples
+python example_usage.py
+
+# Test all inspirations
+TEST_MODE=1 python test_local.py
 ```
 
-### "Secret not found" error
+## 📚 Documentation
+
+- **README.md** - This file (overview & quick start)
+- **USAGE.md** - Detailed API documentation
+- **PROJECT_SUMMARY.md** - Complete project structure
+- **GITHUB_SETUP.md** - GitHub connection guide
+- **NEXT_STEPS.md** - What to do next
+
+## 🔗 FAL Models Used
+
+Currently using:
+- [Nano Banana](https://fal.ai/models/fal-ai/nano-banana/edit) - Google's image editing model
+
+Can be extended to support:
+- Flux models
+- Stable Diffusion variants
+- Custom trained models
+
+## 🛠️ Development
+
 ```bash
-# Check secrets
-fal secrets list
+# Activate environment
+source venv/bin/activate
 
-# Set again
-fal secrets set OPENAI_API_KEY="your-key"
+# Make changes to inspirations_config.py or stock_inspirations_app.py
+
+# Test locally
+python test_local.py
+
+# Deploy changes
+fal deploy stock_inspirations_app.py
+
+# Check logs
+fal apps list
+fal logs <app-id>
 ```
 
-### Cold start too slow
-```python
-# Increase keep_alive in stock_inspirations_app.py
-@fal.endpoint("/")
-def generate_inspirations(...):
-    ...
-```
+## 🎯 Use Cases
 
-### Memory error
-```python
-# Use larger machine type
-machine_type = "L"  # or even "XL"
-```
+- **E-commerce**: Product photography variations
+- **Marketing**: Multiple ad creative variations
+- **Stock Photography**: Expand portfolio with variations
+- **Content Creation**: Quick style exploration
+- **Product Design**: Visualize in different contexts
 
-## 📚 Additional Resources
+## ⚠️ Requirements
 
-- [FAL Serverless Documentation](https://docs.fal.ai/serverless)
-- [FAL Python SDK Reference](https://docs.fal.ai/serverless/python-sdk)
-- [FAL Pricing](https://fal.ai/pricing)
-- [FAL Community Discord](https://discord.gg/fal)
+- Python 3.8+
+- FAL.ai account ([sign up](https://fal.ai))
+- Input images must be accessible URLs
 
-## 🤝 Support
+## 🤝 Contributing
 
-For your questions:
-1. Join the FAL Discord community
-2. Send an email to [email protected]
-3. [Apply for Enterprise features](mailto:[email protected])
+Contributions welcome! To add new inspirations:
 
+1. Fork the repository
+2. Add inspiration config to `inspirations_config.py`
+3. Test with `test_local.py`
+4. Submit pull request
+
+## 📄 License
+
+MIT License - See LICENSE file
+
+## 🔗 Links
+
+- [FAL.ai Platform](https://fal.ai)
+- [FAL Serverless Docs](https://docs.fal.ai/serverless)
+- [Nano Banana Model](https://fal.ai/models/fal-ai/nano-banana/edit)
+
+## 💡 Tips
+
+1. **Upload images first**: Use FAL storage for better performance
+2. **Batch processing**: Process multiple images in sequence
+3. **Monitor costs**: Check FAL dashboard regularly
+4. **Cache results**: Store generated images if used frequently
+5. **Retry logic**: Use `apply_inspiration_with_retry()` for production
+
+## 🚀 Next Steps
+
+1. **Deploy**: `./deploy.sh`
+2. **Test**: `python test_local.py`
+3. **Integrate**: Import client in your app
+4. **Monitor**: Check FAL dashboard for usage
+
+---
+
+**Ready to transform your stock images?** Start with `./setup_and_deploy.sh` 🎨

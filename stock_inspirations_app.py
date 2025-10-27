@@ -1,60 +1,61 @@
 """
-FAL.ai Serverless Deployment for Stock Image Inspirations Generator
+FAL.ai Serverless Deployment for Stock Image Inspirations
+Applies fixed inspirations to input images using FAL models
 """
 
 import os
 import uuid
+import base64
+from io import BytesIO
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field
 import fal
+from inspirations_config import (
+    get_inspiration_config, 
+    list_inspiration_types,
+    validate_input_images,
+    get_endpoint_config
+)
 
 
 # Input Model
 class StockImageInspirationsInput(BaseModel):
-    user_prompt: str = Field(
-        default="professional business meeting in modern office",
-        description="User's base prompt or concept for the stock image",
+    inspiration_type: str = Field(
+        default="variations",
+        description="Type of inspiration to apply (variations, change_pose, fuse_images, marketplace_pure, marketplace_lifestyle, etc.)"
+    )
+    image_urls: List[str] = Field(
+        default=[],
+        description="List of input image URLs (1-5 images depending on inspiration type)",
         min_length=1,
-        max_length=500
+        max_length=5
     )
-    style_preferences: Optional[List[str]] = Field(
+    custom_params: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="List of style preferences (e.g., 'modern', 'minimalist', 'vintage')",
-        max_length=10
+        description="Optional custom parameters to override defaults (e.g., num_images, style_option)"
     )
-    num_inspirations: int = Field(
-        default=3,
-        description="Number of inspiration variations to generate",
-        ge=1,
-        le=10
-    )
-    include_keywords: bool = Field(
-        default=True,
-        description="Whether to include searchable keywords for each inspiration"
-    )
-    include_negative_prompts: bool = Field(
-        default=True,
-        description="Whether to include negative prompts for better image generation"
-    )
-    target_use_case: Optional[str] = Field(
-        default=None,
-        description="Target use case (e.g., 'marketing', 'editorial', 'social media')"
+    output_format: str = Field(
+        default="png",
+        description="Output image format (png, jpeg, webp)",
+        pattern="^(png|jpeg|webp)$"
     )
 
 
 # Output Models
-class InspirationItem(BaseModel):
-    title: str = Field(description="Creative title for the inspiration")
-    prompt: str = Field(description="Detailed, optimized prompt for image generation")
-    negative_prompt: Optional[str] = Field(default=None, description="Negative prompt to avoid unwanted elements")
-    keywords: List[str] = Field(description="Relevant keywords for searchability")
-    style_tags: List[str] = Field(description="Style categorization tags")
+class GeneratedImage(BaseModel):
+    url: str = Field(description="URL of the generated image")
+    index: int = Field(description="Index of the generated image")
 
 
 class StockImageInspirationsOutput(BaseModel):
-    inspirations: List[InspirationItem] = Field(description="List of generated inspirations")
-    original_prompt: str = Field(description="The original user prompt")
+    images: List[GeneratedImage] = Field(description="List of generated images")
+    inspiration_type: str = Field(description="The inspiration type that was applied")
+    inspiration_name: str = Field(description="Human-readable name of the inspiration")
+    prompt_used: str = Field(description="The actual prompt sent to the FAL model")
+    fal_endpoint: str = Field(description="The FAL endpoint that was called")
+    input_image_count: int = Field(description="Number of input images provided")
+    output_image_count: int = Field(description="Number of images generated")
     processing_time: float = Field(description="Time taken in seconds")
     request_id: str = Field(description="Unique request identifier")
     success: bool = Field(default=True, description="Whether the operation was successful")
@@ -69,22 +70,22 @@ class StockImageInspirations(fal.App):
     min_concurrency = 0
     max_concurrency = 5
     max_multiplexing = 3
-    request_timeout = 30
+    request_timeout = 60
     startup_timeout = 30
     concurrency_buffer = 0
     concurrency_buffer_perc = 0
     
     host_kwargs = {
         "keep_alive": 0,
-        "request_timeout": 30,
+        "request_timeout": 60,
         "startup_timeout": 30,
     }
     
     requirements = [
-        "openai>=1.0.0",
-        "python-dotenv",
+        "fal-client>=0.4.0",
+        "Pillow>=10.0.0",
         "pydantic>=2.0.0",
-        "orjson>=3.9.0",
+        "aiohttp>=3.8.0",
     ]
     
     def setup(self):
@@ -92,83 +93,93 @@ class StockImageInspirations(fal.App):
         print("INFO: Stock Image Inspirations application setup completed")
     
     @fal.endpoint("/")
-    async def generate_inspirations(
+    async def apply_inspiration(
         self, 
         input: StockImageInspirationsInput
     ) -> StockImageInspirationsOutput:
-        """Generates creative inspirations for stock image generation."""
+        """Apply a fixed inspiration to input images using FAL models."""
         import time
-        from openai import OpenAI
-        import json
+        import fal_client
         
         request_id = str(uuid.uuid4())
         start_time = time.time()
         warnings = []
         
         try:
-            print(f"[{request_id}] Starting inspiration generation request")
-            print(f"[{request_id}] User prompt: {input.user_prompt}")
+            print(f"[{request_id}] Starting inspiration application")
+            print(f"[{request_id}] Inspiration type: {input.inspiration_type}")
+            print(f"[{request_id}] Input images: {len(input.image_urls)}")
             
-            # Check OpenAI API key
-            openai_key = os.getenv("OPENAI_API_KEY")
-            if not openai_key:
-                raise ValueError("OPENAI_API_KEY not set in environment")
-            
-            # Build the system prompt
-            system_prompt = build_system_prompt(
-                num_inspirations=input.num_inspirations,
-                include_keywords=input.include_keywords,
-                include_negative_prompts=input.include_negative_prompts,
-                target_use_case=input.target_use_case
-            )
-            
-            # Build the user message
-            user_message = build_user_message(
-                user_prompt=input.user_prompt,
-                style_preferences=input.style_preferences,
-                target_use_case=input.target_use_case
-            )
-            
-            print(f"[{request_id}] Calling OpenAI API")
-            
-            # Call OpenAI
-            client = OpenAI(api_key=openai_key)
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
-                max_tokens=2000,
-                temperature=0.8,
-                response_format={"type": "json_object"}
-            )
-            
-            response_text = response.choices[0].message.content
-            
-            # Parse JSON response
-            print(f"[{request_id}] Parsing response")
-            response_json = json.loads(response_text)
-            
-            # Validate and structure the response
-            inspirations = []
-            for item in response_json.get("inspirations", []):
-                inspiration = InspirationItem(
-                    title=item.get("title", "Untitled"),
-                    prompt=item.get("prompt", ""),
-                    negative_prompt=item.get("negative_prompt") if input.include_negative_prompts else None,
-                    keywords=item.get("keywords", []) if input.include_keywords else [],
-                    style_tags=item.get("style_tags", [])
+            # Get inspiration configuration
+            inspiration_config = get_inspiration_config(input.inspiration_type)
+            if not inspiration_config:
+                available = list_inspiration_types()
+                raise ValueError(
+                    f"Unknown inspiration type: {input.inspiration_type}. "
+                    f"Available types: {', '.join(available)}"
                 )
-                inspirations.append(inspiration)
+            
+            # Validate input image count
+            if not validate_input_images(input.inspiration_type, len(input.image_urls)):
+                min_imgs = inspiration_config.get("min_input_images", 1)
+                max_imgs = inspiration_config.get("max_input_images", 1)
+                raise ValueError(
+                    f"Inspiration '{input.inspiration_type}' requires {min_imgs}-{max_imgs} "
+                    f"input images, but {len(input.image_urls)} were provided"
+                )
+            
+            # Build prompt
+            prompt = build_prompt(inspiration_config, input.custom_params)
+            print(f"[{request_id}] Prompt: {prompt}")
+            
+            # Get FAL endpoint
+            fal_endpoint = inspiration_config["fal_endpoint"]
+            print(f"[{request_id}] FAL endpoint: {fal_endpoint}")
+            
+            # Prepare FAL arguments
+            fal_arguments = prepare_fal_arguments(
+                inspiration_config=inspiration_config,
+                image_urls=input.image_urls,
+                prompt=prompt,
+                custom_params=input.custom_params,
+                output_format=input.output_format
+            )
+            
+            # Call FAL endpoint
+            print(f"[{request_id}] Calling FAL endpoint...")
+            handler = await fal_client.submit_async(
+                fal_endpoint,
+                arguments=fal_arguments,
+            )
+            
+            # Wait for completion
+            async for event in handler.iter_events(with_logs=True):
+                if hasattr(event, 'message'):
+                    print(f"[{request_id}] FAL: {event.message}")
+            
+            result = await handler.get()
+            
+            # Parse results
+            generated_images = []
+            if "images" in result:
+                for idx, img in enumerate(result["images"]):
+                    generated_images.append(GeneratedImage(
+                        url=img.get("url", ""),
+                        index=idx
+                    ))
             
             processing_time = time.time() - start_time
             print(f"[{request_id}] Completed in {processing_time:.2f}s")
-            print(f"[{request_id}] Generated {len(inspirations)} inspirations")
+            print(f"[{request_id}] Generated {len(generated_images)} images")
             
             return StockImageInspirationsOutput(
-                inspirations=inspirations,
-                original_prompt=input.user_prompt,
+                images=generated_images,
+                inspiration_type=input.inspiration_type,
+                inspiration_name=inspiration_config["name"],
+                prompt_used=prompt,
+                fal_endpoint=fal_endpoint,
+                input_image_count=len(input.image_urls),
+                output_image_count=len(generated_images),
                 processing_time=processing_time,
                 request_id=request_id,
                 success=True,
@@ -180,8 +191,13 @@ class StockImageInspirations(fal.App):
             print(f"[{request_id}] Error: {str(e)}")
             
             return StockImageInspirationsOutput(
-                inspirations=[],
-                original_prompt=input.user_prompt,
+                images=[],
+                inspiration_type=input.inspiration_type,
+                inspiration_name="Unknown",
+                prompt_used="",
+                fal_endpoint="",
+                input_image_count=len(input.image_urls),
+                output_image_count=0,
                 processing_time=processing_time,
                 request_id=request_id,
                 success=False,
@@ -190,76 +206,139 @@ class StockImageInspirations(fal.App):
 
 
 # Helper functions
-def build_system_prompt(
-    num_inspirations: int,
-    include_keywords: bool,
-    include_negative_prompts: bool,
-    target_use_case: Optional[str]
+def build_prompt(
+    inspiration_config: Dict[str, Any],
+    custom_params: Optional[Dict[str, Any]]
 ) -> str:
-    """Build the system prompt for OpenAI."""
+    """Build the prompt from template and parameters."""
+    prompt_template = inspiration_config.get("prompt_template", "")
     
-    base_prompt = f"""You are an expert stock photography curator and prompt engineer specializing in AI image generation.
+    # Handle different template variables
+    params = {}
+    
+    # For variations
+    if "{num_variations}" in prompt_template:
+        params["num_variations"] = custom_params.get("num_variations", 4) if custom_params else 4
+    
+    # For pose changes
+    if "{pose_description}" in prompt_template:
+        pose_options = inspiration_config.get("pose_options", [])
+        if custom_params and "pose_option" in custom_params:
+            params["pose_description"] = custom_params["pose_option"]
+        elif pose_options:
+            params["pose_description"] = pose_options[0]
+        else:
+            params["pose_description"] = "natural pose"
+    
+    # For fusion
+    if "{fusion_style}" in prompt_template:
+        fusion_styles = inspiration_config.get("fusion_styles", [])
+        if custom_params and "fusion_style" in custom_params:
+            params["fusion_style"] = custom_params["fusion_style"]
+        elif fusion_styles:
+            params["fusion_style"] = fusion_styles[0]
+        else:
+            params["fusion_style"] = "natural blend"
+    
+    # For lifestyle
+    if "{lifestyle_context}" in prompt_template:
+        lifestyle_contexts = inspiration_config.get("lifestyle_contexts", [])
+        if custom_params and "lifestyle_context" in custom_params:
+            params["lifestyle_context"] = custom_params["lifestyle_context"]
+        elif lifestyle_contexts:
+            params["lifestyle_context"] = lifestyle_contexts[0]
+        else:
+            params["lifestyle_context"] = "modern setting"
+    
+    # For style transfer
+    if "{style_type}" in prompt_template:
+        style_types = inspiration_config.get("style_types", [])
+        if custom_params and "style_type" in custom_params:
+            params["style_type"] = custom_params["style_type"]
+        elif style_types:
+            params["style_type"] = style_types[0]
+        else:
+            params["style_type"] = "professional"
+    
+    # For background change
+    if "{background_type}" in prompt_template:
+        background_types = inspiration_config.get("background_types", [])
+        if custom_params and "background_type" in custom_params:
+            params["background_type"] = custom_params["background_type"]
+        elif background_types:
+            params["background_type"] = background_types[0]
+        else:
+            params["background_type"] = "neutral background"
+    
+    # For seasonal
+    if "{season}" in prompt_template:
+        seasons = inspiration_config.get("seasons", ["spring", "summer", "autumn", "winter"])
+        if custom_params and "season" in custom_params:
+            params["season"] = custom_params["season"]
+        else:
+            params["season"] = seasons[0]
+    
+    # For time of day
+    if "{time_of_day}" in prompt_template:
+        times = inspiration_config.get("times_of_day", {})
+        if custom_params and "time_of_day" in custom_params:
+            time_key = custom_params["time_of_day"]
+            if time_key in times:
+                params["time_of_day"] = time_key
+                params["lighting_description"] = times[time_key]
+            else:
+                params["time_of_day"] = list(times.keys())[0]
+                params["lighting_description"] = list(times.values())[0]
+        else:
+            params["time_of_day"] = list(times.keys())[0] if times else "golden_hour"
+            params["lighting_description"] = list(times.values())[0] if times else "warm light"
+    
+    # Format the template
+    try:
+        return prompt_template.format(**params)
+    except KeyError:
+        # If formatting fails, return template as-is
+        return prompt_template
 
-Your task is to generate {num_inspirations} creative, diverse inspirations based on the user's concept. Each inspiration should:
-1. Have a catchy, descriptive title
-2. Include a detailed, optimized prompt for AI image generation (FLUX, Stable Diffusion, etc.)
-3. Be commercially viable as a stock image
-4. Include specific details about lighting, composition, mood, and technical aspects
-"""
-    
-    if target_use_case:
-        base_prompt += f"\n5. Be optimized for {target_use_case} use cases"
-    
-    if include_keywords:
-        base_prompt += "\n6. Include 5-10 searchable keywords that would help people find this image in a stock library"
-    
-    if include_negative_prompts:
-        base_prompt += "\n7. Include a negative prompt listing elements to avoid (e.g., 'blurry, low quality, distorted')"
-    
-    json_structure = {
-        "inspirations": [
-            {
-                "title": "Creative title for the image concept",
-                "prompt": "Detailed prompt for image generation...",
-                "style_tags": ["tag1", "tag2", "tag3"]
-            }
-        ]
-    }
-    
-    if include_keywords:
-        json_structure["inspirations"][0]["keywords"] = ["keyword1", "keyword2", "keyword3"]
-    
-    if include_negative_prompts:
-        json_structure["inspirations"][0]["negative_prompt"] = "Elements to avoid..."
-    
-    base_prompt += f"\n\nReturn your response as a JSON object with this structure:\n{json.dumps(json_structure, indent=2)}"
-    base_prompt += "\n\nMake each inspiration unique and distinct from the others. Focus on commercial viability and visual appeal."
-    
-    return base_prompt
 
-
-def build_user_message(
-    user_prompt: str,
-    style_preferences: Optional[List[str]],
-    target_use_case: Optional[str]
-) -> str:
-    """Build the user message for OpenAI."""
+def prepare_fal_arguments(
+    inspiration_config: Dict[str, Any],
+    image_urls: List[str],
+    prompt: str,
+    custom_params: Optional[Dict[str, Any]],
+    output_format: str
+) -> Dict[str, Any]:
+    """Prepare arguments for FAL endpoint call."""
     
-    message = f"Base concept: {user_prompt}"
+    # Start with default params from config
+    arguments = inspiration_config.get("default_params", {}).copy()
     
-    if style_preferences:
-        message += f"\n\nStyle preferences: {', '.join(style_preferences)}"
+    # Add prompt
+    arguments["prompt"] = prompt
     
-    if target_use_case:
-        message += f"\n\nTarget use case: {target_use_case}"
+    # Add images
+    arguments["image_urls"] = image_urls
     
-    message += "\n\nGenerate creative, diverse inspirations that would work well as professional stock images."
+    # Override with custom params if provided
+    if custom_params:
+        for key, value in custom_params.items():
+            if key not in ["pose_option", "fusion_style", "lifestyle_context", 
+                          "style_type", "background_type", "season", "time_of_day",
+                          "num_variations"]:  # These are used for prompt building
+                arguments[key] = value
     
-    return message
+    # Set output format
+    arguments["output_format"] = output_format
+    
+    return arguments
 
 
 # For local testing
 if __name__ == "__main__":
     print("Stock Image Inspirations FAL Serverless App")
     print("This file should be deployed using: fal deploy stock_inspirations_app.py")
-
+    print()
+    print("Available inspirations:")
+    for insp_type in list_inspiration_types():
+        config = get_inspiration_config(insp_type)
+        print(f"  - {insp_type}: {config['description']}")

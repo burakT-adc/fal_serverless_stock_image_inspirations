@@ -1,11 +1,17 @@
 """
 Client wrapper for FAL Serverless Stock Image Inspirations endpoint.
+Applies fixed inspirations to images using FAL models.
 """
 
 import asyncio
 from typing import List, Optional, Dict, Any
 from logging import Logger
 import os
+from inspirations_config import (
+    get_inspiration_config,
+    list_inspiration_types,
+    validate_input_images
+)
 
 
 class StockImageInspirationsFalServerless:
@@ -51,52 +57,71 @@ class StockImageInspirationsFalServerless:
         else:
             print(f"[{level.upper()}] {message}")
     
-    async def generate_inspirations(
+    def list_inspirations(self) -> List[str]:
+        """List all available inspiration types."""
+        return list_inspiration_types()
+    
+    def get_inspiration_info(self, inspiration_type: str) -> Optional[Dict[str, Any]]:
+        """Get information about a specific inspiration type."""
+        return get_inspiration_config(inspiration_type)
+    
+    async def apply_inspiration(
         self,
-        user_prompt: str,
-        style_preferences: Optional[List[str]] = None,
-        num_inspirations: int = 3,
-        include_keywords: bool = True,
-        include_negative_prompts: bool = True,
-        target_use_case: Optional[str] = None
+        inspiration_type: str,
+        image_urls: List[str],
+        custom_params: Optional[Dict[str, Any]] = None,
+        output_format: str = "png"
     ) -> Dict[str, Any]:
         """
-        Generate creative inspirations for stock image generation.
+        Apply a fixed inspiration to input images.
         
         Args:
-            user_prompt: User's base prompt or concept for the stock image
-            style_preferences: List of style preferences (e.g., 'modern', 'minimalist')
-            num_inspirations: Number of inspiration variations to generate (1-10)
-            include_keywords: Whether to include searchable keywords
-            include_negative_prompts: Whether to include negative prompts
-            target_use_case: Target use case (e.g., 'marketing', 'editorial')
+            inspiration_type: Type of inspiration (variations, change_pose, fuse_images, etc.)
+            image_urls: List of input image URLs (1-5 images depending on inspiration)
+            custom_params: Optional custom parameters to override defaults
+            output_format: Output image format (png, jpeg, webp)
             
         Returns:
-            Dict containing inspirations and metadata
+            Dict containing generated images and metadata
         """
         if not self.fal_available:
             raise RuntimeError("fal_client not available. Install with: pip install fal-client")
+        
+        # Validate inspiration type
+        if inspiration_type not in list_inspiration_types():
+            available = list_inspiration_types()
+            raise ValueError(
+                f"Unknown inspiration type: {inspiration_type}. "
+                f"Available: {', '.join(available)}"
+            )
+        
+        # Validate input image count
+        if not validate_input_images(inspiration_type, len(image_urls)):
+            config = get_inspiration_config(inspiration_type)
+            min_imgs = config.get("min_input_images", 1)
+            max_imgs = config.get("max_input_images", 1)
+            raise ValueError(
+                f"Inspiration '{inspiration_type}' requires {min_imgs}-{max_imgs} "
+                f"input images, but {len(image_urls)} were provided"
+            )
         
         import fal_client
         
         try:
             # Prepare arguments
             arguments = {
-                "user_prompt": user_prompt,
-                "num_inspirations": num_inspirations,
-                "include_keywords": include_keywords,
-                "include_negative_prompts": include_negative_prompts,
+                "inspiration_type": inspiration_type,
+                "image_urls": image_urls,
+                "output_format": output_format,
             }
             
-            if style_preferences:
-                arguments["style_preferences"] = style_preferences
-            
-            if target_use_case:
-                arguments["target_use_case"] = target_use_case
+            if custom_params:
+                arguments["custom_params"] = custom_params
             
             # Call FAL Serverless endpoint
             self._log("info", f"Calling FAL Serverless endpoint: {self.endpoint}")
-            self._log("info", f"User prompt: {user_prompt}")
+            self._log("info", f"Inspiration type: {inspiration_type}")
+            self._log("info", f"Input images: {len(image_urls)}")
             
             handler = await fal_client.submit_async(
                 self.endpoint,
@@ -112,33 +137,35 @@ class StockImageInspirationsFalServerless:
             
             # Log results
             self._log("info", f"FAL Serverless processing time: {result.get('processing_time', 'N/A')}s")
-            self._log("info", f"Generated {len(result.get('inspirations', []))} inspirations")
+            self._log("info", f"Generated {result.get('output_image_count', 0)} images")
             
             return result
             
         except Exception as e:
-            error_msg = f"FAL Serverless inspiration generation failed: {e}"
+            error_msg = f"FAL Serverless inspiration application failed: {e}"
             self._log("error", error_msg)
             raise RuntimeError(error_msg)
     
-    async def generate_inspirations_with_retry(
+    async def apply_inspiration_with_retry(
         self,
-        user_prompt: str,
+        inspiration_type: str,
+        image_urls: List[str],
         max_retries: int = 3,
-        timeout: int = 30,
+        timeout: int = 60,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Generate inspirations with retry logic.
+        Apply inspiration with retry logic.
         
         Args:
-            user_prompt: User's base prompt or concept
+            inspiration_type: Type of inspiration to apply
+            image_urls: List of input image URLs
             max_retries: Maximum retry attempts
             timeout: Timeout in seconds per attempt
-            **kwargs: Additional arguments for generate_inspirations()
+            **kwargs: Additional arguments for apply_inspiration()
             
         Returns:
-            Dict containing inspirations and metadata
+            Dict containing generated images and metadata
         """
         attempt = 0
         last_error = None
@@ -148,8 +175,9 @@ class StockImageInspirationsFalServerless:
             try:
                 self._log("info", f"Attempt {attempt}/{max_retries}")
                 result = await asyncio.wait_for(
-                    self.generate_inspirations(
-                        user_prompt=user_prompt,
+                    self.apply_inspiration(
+                        inspiration_type=inspiration_type,
+                        image_urls=image_urls,
                         **kwargs
                     ),
                     timeout=timeout
@@ -174,22 +202,27 @@ class StockImageInspirationsFalServerless:
 
 
 # Convenience function
-async def generate_stock_image_inspirations(
-    user_prompt: str,
+async def apply_stock_image_inspiration(
+    inspiration_type: str,
+    image_urls: List[str],
     endpoint: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """
-    Convenience function to generate inspirations without creating a client instance.
+    Convenience function to apply inspiration without creating a client instance.
     
     Args:
-        user_prompt: User's base prompt or concept
+        inspiration_type: Type of inspiration to apply
+        image_urls: List of input image URLs
         endpoint: FAL endpoint URL (optional)
-        **kwargs: Additional arguments for generate_inspirations()
+        **kwargs: Additional arguments for apply_inspiration()
         
     Returns:
-        Dict containing inspirations and metadata
+        Dict containing generated images and metadata
     """
     client = StockImageInspirationsFalServerless(endpoint=endpoint)
-    return await client.generate_inspirations(user_prompt=user_prompt, **kwargs)
-
+    return await client.apply_inspiration(
+        inspiration_type=inspiration_type,
+        image_urls=image_urls,
+        **kwargs
+    )

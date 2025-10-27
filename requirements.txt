@@ -1,17 +1,15 @@
-# FAL Serverless Requirements (CPU Optimized)
+# FAL Serverless Requirements
 # These are needed for both deployment and client
 
 # Core
 fal-client>=0.4.0
 
-# For prompt generation and optimization
-openai>=1.0.0
+# Image processing
+Pillow>=10.0.0
 
 # Utilities
 python-dotenv
-aiohttp
+aiohttp>=3.8.0
 
-# Enhanced validation and monitoring
+# Enhanced validation
 pydantic>=2.0.0
-orjson>=3.9.0
-
