@@ -25,7 +25,31 @@ class VertexAIImageEditor:
     def get_client(self) -> genai.Client:
         """Get or create Vertex AI client."""
         if self._client is None:
-            self._client = genai.Client(vertexai=True)
+            # Read project from credentials if available
+            import os
+            import json
+            project_id = None
+            location = "us-central1"  # Default location
+            
+            # Try to read from credentials file
+            cred_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            if cred_file and os.path.exists(cred_file):
+                try:
+                    with open(cred_file, 'r') as f:
+                        creds = json.load(f)
+                        project_id = creds.get("project_id")
+                except:
+                    pass
+            
+            # If not found, try environment variable
+            if not project_id:
+                project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "adcreative-official")
+            
+            self._client = genai.Client(
+                vertexai=True,
+                project=project_id,
+                location=location
+            )
         return self._client
     
     async def edit_image(
