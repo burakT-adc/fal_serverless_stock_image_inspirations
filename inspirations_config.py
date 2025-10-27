@@ -32,14 +32,14 @@ INSPIRATIONS_CONFIG = {
         "fal_endpoint": "fal-ai/nano-banana/edit",
         "input_type": InputType.OPTIONAL_MULTI,
         "default_params": {
-            "num_images": 4,
+            "num_images": 3,
             "output_format": "png",
             "enable_safety_checks": True
         },
         "prompt_template": "create {num_variations} professional variations of this image, maintaining the core subject but varying composition, lighting, and perspective for stock photography use",
         "min_input_images": 1,
         "max_input_images": 5,
-        "typical_output_count": 4
+        "typical_output_count": 3
     },
     
     "change_pose": {
@@ -138,7 +138,7 @@ INSPIRATIONS_CONFIG = {
         "fal_endpoint": "fal-ai/nano-banana/edit",
         "input_type": InputType.SINGLE_IMAGE,
         "default_params": {
-            "num_images": 4,
+            "num_images": 3,
             "output_format": "png",
             "enable_safety_checks": True
         },
@@ -154,7 +154,7 @@ INSPIRATIONS_CONFIG = {
         ],
         "min_input_images": 1,
         "max_input_images": 1,
-        "typical_output_count": 4
+        "typical_output_count": 3
     },
     
     "background_change": {
@@ -206,7 +206,7 @@ INSPIRATIONS_CONFIG = {
         "fal_endpoint": "fal-ai/nano-banana/edit",
         "input_type": InputType.SINGLE_IMAGE,
         "default_params": {
-            "num_images": 4,
+            "num_images": 3,
             "output_format": "png",
             "enable_safety_checks": True
         },
@@ -214,7 +214,7 @@ INSPIRATIONS_CONFIG = {
         "seasons": ["spring", "summer", "autumn", "winter"],
         "min_input_images": 1,
         "max_input_images": 1,
-        "typical_output_count": 4
+        "typical_output_count": 3
     },
     
     "time_of_day": {
@@ -224,7 +224,7 @@ INSPIRATIONS_CONFIG = {
         "fal_endpoint": "fal-ai/nano-banana/edit",
         "input_type": InputType.SINGLE_IMAGE,
         "default_params": {
-            "num_images": 4,
+            "num_images": 3,
             "output_format": "png",
             "enable_safety_checks": True
         },
@@ -237,7 +237,7 @@ INSPIRATIONS_CONFIG = {
         },
         "min_input_images": 1,
         "max_input_images": 1,
-        "typical_output_count": 4
+        "typical_output_count": 3
     }
 }
 
@@ -281,6 +281,14 @@ FAL_ENDPOINTS_CONFIG = {
         "typical_latency_seconds": 3.0,
         "cost_per_image": 0.039,
         "documentation_url": "https://fal.ai/models/fal-ai/nano-banana/edit"
+    },
+    "vertex-ai/gemini-2.5-flash-image": {
+        "description": "Gemini 2.5 Flash Image editing model on Vertex AI",
+        "supports_multi_image": True,
+        "max_images_input": 10,
+        "typical_latency_seconds": 2.5,
+        "cost_per_image": 0.025,  # Estimate - actual pricing varies
+        "documentation_url": "https://ai.google.dev/gemini-api/docs/image-generation"
     }
 }
 
