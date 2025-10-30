@@ -1,260 +1,161 @@
+#!/usr/bin/env python3
 """
-Example usage of Stock Image Inspirations FAL Serverless
+Example usage of Stock Image Inspirations endpoint.
 """
-
 import asyncio
 import os
-from stock_inspirations_fal_client import StockImageInspirationsFalServerless
-from inspirations_config import list_inspiration_types, get_inspiration_config
+from pathlib import Path
+from dotenv import load_dotenv
+import fal_client
+
+# Load environment
+load_dotenv()
+
+# Your deployed endpoint
+ENDPOINT = "Adc/stock-inspirations"
 
 
-# Example image URLs (replace with your own)
-EXAMPLE_IMAGE_SINGLE = "https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png"
-EXAMPLE_IMAGE_MULTI = [
-    "https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png",
-    "https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png"
-]
+async def setup_fal():
+    """Setup FAL client."""
+    fal_key = os.getenv("FAL_API_KEY") or os.getenv("FAL_KEY")
+    if not fal_key:
+        raise ValueError("FAL_KEY not found in .env file")
+    os.environ["FAL_KEY"] = fal_key
 
 
-async def basic_example():
-    """Basic usage example - variations."""
-    print("=" * 80)
-    print("BASIC EXAMPLE - Variations")
-    print("=" * 80)
+async def example_variations():
+    """Example: Generate variations of an image."""
+    print("\n" + "="*60)
+    print("Example 1: Variations")
+    print("="*60)
     
-    client = StockImageInspirationsFalServerless()
+    # Upload test image
+    test_image = Path(__file__).parent / "test" / "image_kontext_inpaint.jpeg"
+    image_url = fal_client.upload_file(test_image)
     
-    result = await client.apply_inspiration(
-        inspiration_type="variations",
-        image_urls=[EXAMPLE_IMAGE_SINGLE],
-        custom_params={"num_variations": 4}
+    handler = await fal_client.submit_async(
+        ENDPOINT,
+        arguments={
+            "inspiration_name": "variations",
+            "image_urls": [image_url]
+        }
     )
     
-    if result["success"]:
-        print(f"\n✅ Success! Generated {result['output_image_count']} images in {result['processing_time']:.2f}s")
-        print(f"Inspiration: {result['inspiration_name']}")
-        print(f"Prompt used: {result['prompt_used']}")
-        print(f"\nGenerated images:")
-        for img in result["images"]:
-            print(f"  {img['index']}: {img['url']}")
-    else:
-        print(f"\n❌ Failed: {result.get('warnings')}")
+    result = await handler.get()
+    
+    print(f"Success: {result['success']}")
+    print(f"Processing time: {result['processing_time']:.2f}s")
+    print(f"Generated {len(result['images'])} images:")
+    for img in result['images']:
+        print(f"  [{img['index']}] {img['url']}")
 
 
-async def marketplace_pure_example():
-    """Marketplace pure product photography."""
-    print("\n" + "=" * 80)
-    print("MARKETPLACE PURE EXAMPLE")
-    print("=" * 80)
+async def example_marketplace_with_aspect_ratio():
+    """Example: Marketplace with custom aspect ratio."""
+    print("\n" + "="*60)
+    print("Example 2: Marketplace Pure (1:1 aspect ratio)")
+    print("="*60)
     
-    client = StockImageInspirationsFalServerless()
+    test_image = Path(__file__).parent / "test" / "image_kontext_inpaint.jpeg"
+    image_url = fal_client.upload_file(test_image)
     
-    result = await client.apply_inspiration(
-        inspiration_type="marketplace_pure",
-        image_urls=[EXAMPLE_IMAGE_SINGLE]
+    handler = await fal_client.submit_async(
+        ENDPOINT,
+        arguments={
+            "inspiration_name": "marketplace_pure",
+            "image_urls": [image_url],
+            "aspect_ratio": "1:1"  # Square format
+        }
     )
     
-    if result["success"]:
-        print(f"\n✅ Transformed to marketplace pure style")
-        print(f"Generated {result['output_image_count']} variations")
-        print(f"Prompt: {result['prompt_used']}")
-    else:
-        print(f"\n❌ Failed: {result.get('warnings')}")
+    result = await handler.get()
+    
+    print(f"Success: {result['success']}")
+    print(f"Aspect ratio: {result.get('aspect_ratio', 'default')}")
+    print(f"Prompt used: {result['prompt_used']}")
+    print(f"Generated {len(result['images'])} images:")
+    for img in result['images']:
+        print(f"  [{img['index']}] {img['url']}")
 
 
-async def marketplace_lifestyle_example():
-    """Marketplace lifestyle photography."""
-    print("\n" + "=" * 80)
-    print("MARKETPLACE LIFESTYLE EXAMPLE")
-    print("=" * 80)
+async def example_with_extra_prompt():
+    """Example: Use extra prompt for customization."""
+    print("\n" + "="*60)
+    print("Example 3: Cinematic Style with Extra Prompt")
+    print("="*60)
     
-    client = StockImageInspirationsFalServerless()
+    test_image = Path(__file__).parent / "test" / "image_kontext_inpaint.jpeg"
+    image_url = fal_client.upload_file(test_image)
     
-    result = await client.apply_inspiration(
-        inspiration_type="marketplace_lifestyle",
-        image_urls=[EXAMPLE_IMAGE_SINGLE],
-        custom_params={"lifestyle_context": "modern home interior setting"}
+    handler = await fal_client.submit_async(
+        ENDPOINT,
+        arguments={
+            "inspiration_name": "style_cinematic",
+            "image_urls": [image_url],
+            "aspect_ratio": "16:9",
+            "extra_prompt": "add dramatic golden hour lighting and deep shadows"
+        }
     )
     
-    if result["success"]:
-        print(f"\n✅ Transformed to marketplace lifestyle")
-        print(f"Context: modern home interior")
-        print(f"Generated {result['output_image_count']} images")
-    else:
-        print(f"\n❌ Failed: {result.get('warnings')}")
+    result = await handler.get()
+    
+    print(f"Success: {result['success']}")
+    print(f"Aspect ratio: {result.get('aspect_ratio', 'default')}")
+    print(f"Prompt used: {result['prompt_used']}")
+    print(f"Generated {len(result['images'])} images:")
+    for img in result['images']:
+        print(f"  [{img['index']}] {img['url']}")
 
 
-async def change_pose_example():
-    """Change pose example."""
-    print("\n" + "=" * 80)
-    print("CHANGE POSE EXAMPLE")
-    print("=" * 80)
-    
-    client = StockImageInspirationsFalServerless()
-    
-    result = await client.apply_inspiration(
-        inspiration_type="change_pose",
-        image_urls=[EXAMPLE_IMAGE_SINGLE],
-        custom_params={"pose_option": "confident standing pose"}
-    )
-    
-    if result["success"]:
-        print(f"\n✅ Pose changed successfully")
-        print(f"New pose: confident standing pose")
-        print(f"Generated {result['output_image_count']} variations")
-    else:
-        print(f"\n❌ Failed: {result.get('warnings')}")
-
-
-async def fuse_images_example():
-    """Fuse multiple images example."""
-    print("\n" + "=" * 80)
-    print("FUSE IMAGES EXAMPLE")
-    print("=" * 80)
-    
-    client = StockImageInspirationsFalServerless()
-    
-    result = await client.apply_inspiration(
-        inspiration_type="fuse_images",
-        image_urls=EXAMPLE_IMAGE_MULTI,
-        custom_params={"fusion_style": "seamless integration with unified lighting"}
-    )
-    
-    if result["success"]:
-        print(f"\n✅ Images fused successfully")
-        print(f"Fusion style: seamless integration")
-        print(f"Input: {result['input_image_count']} images")
-        print(f"Output: {result['output_image_count']} images")
-    else:
-        print(f"\n❌ Failed: {result.get('warnings')}")
-
-
-async def style_transfer_example():
-    """Style transfer example."""
-    print("\n" + "=" * 80)
-    print("STYLE TRANSFER EXAMPLE")
-    print("=" * 80)
-    
-    client = StockImageInspirationsFalServerless()
-    
-    result = await client.apply_inspiration(
-        inspiration_type="style_transfer",
-        image_urls=[EXAMPLE_IMAGE_SINGLE],
-        custom_params={"style_type": "cinematic film photography"}
-    )
-    
-    if result["success"]:
-        print(f"\n✅ Style applied successfully")
-        print(f"Style: cinematic film photography")
-        print(f"Generated {result['output_image_count']} variations")
-    else:
-        print(f"\n❌ Failed: {result.get('warnings')}")
-
-
-async def list_all_inspirations():
+async def list_available_inspirations():
     """List all available inspirations."""
-    print("\n" + "=" * 80)
-    print("ALL AVAILABLE INSPIRATIONS")
-    print("=" * 80)
+    print("\n" + "="*60)
+    print("Available Inspirations")
+    print("="*60)
     
-    client = StockImageInspirationsFalServerless()
+    inspirations = {
+        "variations": "Generate 3 variations with different styles",
+        "marketplace_pure": "Clean marketplace product photography (white background)",
+        "marketplace_lifestyle": "Lifestyle marketplace photography with context",
+        "change_pose": "Change subject pose while maintaining identity",
+        "style_cinematic": "Apply cinematic film photography style",
+        "background_white": "Replace background with clean white studio background",
+        "enhance": "Enhance image quality and sharpness",
+        "fuse_images": "Combine multiple images into cohesive compositions (2-5 images)"
+    }
     
-    inspirations = client.list_inspirations()
-    
-    print(f"\nTotal: {len(inspirations)} inspirations available\n")
-    
-    for insp_type in inspirations:
-        config = client.get_inspiration_info(insp_type)
-        print(f"📸 {config['name']} ({insp_type})")
-        print(f"   {config['description']}")
-        print(f"   Category: {config['category']}")
-        print(f"   Input: {config['min_input_images']}-{config['max_input_images']} images")
-        print(f"   Output: ~{config['typical_output_count']} images")
-        print(f"   Endpoint: {config['fal_endpoint']}")
+    for name, desc in inspirations.items():
+        print(f"  • {name}")
+        print(f"    {desc}")
         print()
-
-
-async def batch_inspirations_example():
-    """Apply multiple inspirations to the same image."""
-    print("\n" + "=" * 80)
-    print("BATCH INSPIRATIONS EXAMPLE")
-    print("=" * 80)
-    
-    client = StockImageInspirationsFalServerless()
-    
-    inspirations_to_apply = [
-        "variations",
-        "marketplace_pure",
-        "style_transfer"
-    ]
-    
-    for insp_type in inspirations_to_apply:
-        print(f"\n→ Applying {insp_type}...")
-        
-        try:
-            result = await client.apply_inspiration(
-                inspiration_type=insp_type,
-                image_urls=[EXAMPLE_IMAGE_SINGLE]
-            )
-            
-            if result["success"]:
-                print(f"  ✅ {result['inspiration_name']}: {result['output_image_count']} images")
-            else:
-                print(f"  ❌ Failed: {result.get('warnings')}")
-        
-        except Exception as e:
-            print(f"  ❌ Error: {e}")
-        
-        # Small delay between requests
-        await asyncio.sleep(1)
 
 
 async def main():
     """Run all examples."""
-    print("\n🎨 Stock Image Inspirations - Usage Examples\n")
-    
-    # Check environment
-    if not os.getenv("FAL_SERVERLESS_INSPIRATIONS_ENDPOINT"):
-        print("⚠️  Warning: FAL_SERVERLESS_INSPIRATIONS_ENDPOINT not set")
-        print("   Set it with: export FAL_SERVERLESS_INSPIRATIONS_ENDPOINT='fal-ai/your-username/stock-image-inspirations'")
-        print()
+    print("\n" + "="*60)
+    print("Stock Image Inspirations - Usage Examples")
+    print("="*60)
+    print(f"\nEndpoint: {ENDPOINT}")
+    print("="*60)
     
     try:
-        # List all inspirations first
-        await list_all_inspirations()
-        await asyncio.sleep(2)
+        await setup_fal()
         
-        # Run examples
-        await basic_example()
-        await asyncio.sleep(2)
+        await list_available_inspirations()
+        await example_variations()
+        await example_marketplace_with_aspect_ratio()
+        await example_with_extra_prompt()
         
-        await marketplace_pure_example()
-        await asyncio.sleep(2)
-        
-        await marketplace_lifestyle_example()
-        await asyncio.sleep(2)
-        
-        await change_pose_example()
-        await asyncio.sleep(2)
-        
-        await fuse_images_example()
-        await asyncio.sleep(2)
-        
-        await style_transfer_example()
-        await asyncio.sleep(2)
-        
-        await batch_inspirations_example()
+        print("\n" + "="*60)
+        print("✅ All examples completed successfully!")
+        print("="*60)
         
     except Exception as e:
-        print(f"\n❌ Error running examples: {e}")
+        print(f"\n❌ Error: {e}")
         print("\nMake sure:")
-        print("  1. FAL endpoint is deployed")
-        print("  2. FAL_SERVERLESS_INSPIRATIONS_ENDPOINT is set")
-        print("  3. FAL_API_KEY is set (if needed)")
-    
-    print("\n" + "=" * 80)
-    print("Examples completed!")
-    print("=" * 80 + "\n")
+        print("  1. You have FAL_KEY in .env file")
+        print("  2. You're authenticated: fal auth login")
+        print("  3. Test image exists in test/ directory")
 
 
 if __name__ == "__main__":
