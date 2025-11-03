@@ -7,94 +7,158 @@ Self-contained version with embedded configuration.
 
 import uuid
 import time
+import asyncio
 from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
 import fal
-
 
 # ============================================================================
 # INSPIRATIONS CONFIGURATION (Embedded)
 # ============================================================================
 
 INSPIRATIONS = {
-    "variations": {
-        "name": "Variations",
-        "description": "Generate 3 variations of the input image with different styles",
-        "prompt_template": "create professional variations of this image, maintaining the core subject but varying composition, lighting, and perspective for stock photography use",
+
+    "free_editing": {
+        "name": "Free Editing",
+        "category": "Free",
+        "description": "Free editing of the input image",
+        "prompt_template": "",
         "num_images": 3,
         "input_type": "single",
         "min_images": 1,
-        "max_images": 1
+        "max_images": 1,
+        "execution_mode": "batch",  # batch = single request with num_images=3
+        "model": "fal-ai/nano-banana/edit"
+    },
+
+    "creative_color_material": {
+        "name": "Variations Color Material",
+        "category": "Creative",
+        "description": "Generate variations of the input image with selected colors/materials",
+        "prompt_template": "create professional variations of this image, maintaining the core subject/product but varying colors/materials for stock photography use",
+        "num_images": 3,
+        "input_type": "single",
+        "min_images": 1,
+        "max_images": 1,
+        "execution_mode": "parallel",  # parallel = 3 separate requests for diversity
+        "model": "fal-ai/nano-banana/edit"
+    },
+
+    "creative_different_angles": {
+        "name": "Different Angles",
+        "category": "Creative",
+        "description": "Generate variations of the input image with different angles",
+        "prompt_template": "create professional variations of this image, maintaining the core subject/product but varying angles for stock photography use",
+        "num_images": 3,
+        "input_type": "single",
+        "min_images": 1,
+        "max_images": 1,
+        "execution_mode": "parallel",  # Need different angles, so parallel
+        "model": "fal-ai/nano-banana/edit"
+    },
+
+    "creative_color_pop": {
+        "name": "Color Pop",
+        "category": "Creative",
+        "description": "Pop the color to make it more vibrant and dramatic with selected colors",
+        "prompt_template": "create professional variations of this image, maintaining the core subject/product but pop the color to make it more vibrant and dramatic",
+        "num_images": 3,
+        "input_type": "single",
+        "min_images": 1,
+        "max_images": 1,
+        "execution_mode": "batch",  # Similar color enhancements, batch is fine
+        "model": "fal-ai/nano-banana/edit"
+    },
+
+    "marketplace_remove_overlays": {
+        "name": "Marketplace Remove Overlays",
+        "category": "Marketplace",
+        "description": "Rebuild a compliant image for Shopping feeds—clear product, no promotional text or watermarks.",
+        "prompt_template": "remove all marketplace overlays like logos, text, and other branding from the image, maintaining the core subject/product",
+        "num_images": 3,
+        "input_type": "single",
+        "min_images": 1,
+        "max_images": 1,
+        "execution_mode": "batch",  # Consistent removal, batch is fine
+        "model": "fal-ai/nano-banana/edit"
     },
     
     "marketplace_pure": {
         "name": "Marketplace Pure",
-        "description": "Transform into clean marketplace product photography (white background)",
+        "category": "Marketplace",
+        "description": "Auto‑clean, crop, and center a product on a pure white background for marketplace compliance and fast approvals.",
         "prompt_template": "transform into clean marketplace product photography: white background, professional studio lighting, high resolution, sharp focus, commercial quality, no distractions",
         "num_images": 3,
         "input_type": "single",
         "min_images": 1,
-        "max_images": 1
+        "max_images": 1,
+        "execution_mode": "batch",  # Consistent style, batch is fine
+        "model": "fal-ai/nano-banana/edit"
     },
     
     "marketplace_lifestyle": {
         "name": "Marketplace Lifestyle",
-        "description": "Transform into lifestyle marketplace photography with context",
+        "category": "Marketplace",
+        "description": "Turn a basic packshot into a minimal lifestyle image that shows real‑world use without distracting overlays.",
         "prompt_template": "transform into lifestyle marketplace photography: modern home interior setting, natural lighting, authentic setting, professional e-commerce quality, contextual background",
         "num_images": 3,
         "input_type": "single",
         "min_images": 1,
-        "max_images": 1
+        "max_images": 1,
+        "execution_mode": "batch",  # Consistent lifestyle style
+        "model": "fal-ai/nano-banana/edit"
+    },
+
+    "marketplace_close_ups": {
+        "name": "Marketplace Close Ups",
+        "category": "Marketplace",
+        "description": "Capture macro cut‑ins that reveal craftsmanship and texture.",
+        "prompt_template": "closeup shot of this product to show its details, like its details, patterns, fabric, capture small important creative details if there is like stiches, collars, logo, very closeup from different angle, closeup macro, no background, no grid just one detail, professional photography quality",
+        "num_images": 3,
+        "input_type": "single",
+        "min_images": 1,
+        "max_images": 1,
+        "execution_mode": "parallel",  # Different closeup angles, need parallel
+        "model": "fal-ai/nano-banana/edit"
     },
     
-    "change_pose": {
+    "fashion_change_pose": {
         "name": "Change Pose",
-        "description": "Change subject pose while maintaining identity",
-        "prompt_template": "change the pose of the subject to a confident professional pose, maintaining the same background and lighting style, professional stock photography quality",
+        "category": "Fashion",
+        "description": "Change subject/model pose while maintaining identity and background",
+        "prompt_template": "change the pose of the subject to different professional pose, maintaining the same background and lighting style, professional fashion photography quality",
         "num_images": 3,
         "input_type": "single",
         "min_images": 1,
-        "max_images": 1
+        "max_images": 1,
+        "execution_mode": "parallel",  # Different poses, need parallel
+        "model": "fal-ai/nano-banana/edit"
     },
     
-    "style_cinematic": {
-        "name": "Cinematic Style",
-        "description": "Apply cinematic film photography style",
-        "prompt_template": "apply cinematic film photography style to this image while maintaining the core subject and composition, professional photography quality",
+    "background_change": {
+        "name": "Change Background",
+        "category": "Creative",
+        "description": "Replace background with described background",
+        "prompt_template": "replace the background with the described background, maintaining the subject perfectly, professional compositing, natural lighting consistency",
         "num_images": 3,
         "input_type": "single",
         "min_images": 1,
-        "max_images": 1
-    },
-    
-    "background_white": {
-        "name": "White Background",
-        "description": "Replace background with clean white studio background",
-        "prompt_template": "replace the background with clean white studio background, maintaining the subject perfectly, professional compositing, natural lighting consistency",
-        "num_images": 3,
-        "input_type": "single",
-        "min_images": 1,
-        "max_images": 1
-    },
-    
-    "enhance": {
-        "name": "Enhance Quality",
-        "description": "Enhance image quality and sharpness",
-        "prompt_template": "enhance image quality to professional stock photography standard: increase sharpness, improve lighting, enhance colors, maximize detail and clarity",
-        "num_images": 3,
-        "input_type": "single",
-        "min_images": 1,
-        "max_images": 1
+        "max_images": 1,
+        "execution_mode": "batch",  # Consistent background change
+        "model": "fal-ai/nano-banana/edit"
     },
     
     "fuse_images": {
         "name": "Fuse Images",
-        "description": "Combine multiple images into cohesive compositions",
+        "category": "Marketplace",
+        "description": "Combine multiple products into cohesive compositions for marketplace compliance",
         "prompt_template": "seamlessly combine these images into a single cohesive composition, natural blend maintaining all subjects, professional stock photography quality",
         "num_images": 3,
         "input_type": "multiple",
         "min_images": 2,
-        "max_images": 5
+        "max_images": 5,
+        "execution_mode": "batch",  # Fusion is consistent operation
+        "model": "fal-ai/nano-banana/edit"
     }
 }
 
@@ -132,18 +196,111 @@ def build_prompt(inspiration_name: str, extra_prompt: Optional[str] = None) -> s
 
 
 # ============================================================================
+# EXECUTION UNIT - Handles both parallel and batch execution
+# ============================================================================
+
+async def execute_generation(
+    model: str,
+    prompt: str,
+    image_urls: List[str],
+    aspect_ratio: Optional[str],
+    execution_mode: str,
+    request_id: str
+) -> List[Dict[str, Any]]:
+    """
+    Execute image generation with specified strategy.
+    
+    Args:
+        model: Model endpoint (e.g., "fal-ai/nano-banana/edit")
+        prompt: Generation prompt
+        image_urls: Input image URLs
+        aspect_ratio: Optional aspect ratio
+        execution_mode: "parallel" or "batch"
+        request_id: Request ID for logging
+    
+    Returns:
+        List of generated images (always 3)
+    """
+    import fal_client
+    
+    # Build base arguments
+    base_arguments = {
+        "prompt": prompt,
+        "image_urls": image_urls,
+        "output_format": "png",
+        "limit_generations": True
+    }
+    
+    # Add aspect_ratio only if provided
+    if aspect_ratio:
+        base_arguments["aspect_ratio"] = aspect_ratio
+    
+    if execution_mode == "parallel":
+        # PARALLEL MODE: 3 separate requests for maximum diversity
+        print(f"[{request_id}] Execution mode: PARALLEL (3 separate requests)")
+        
+        handlers = []
+        for i in range(3):
+            arguments = {**base_arguments, "num_images": 1}
+            handler = await fal_client.submit_async(model, arguments=arguments)
+            handlers.append(handler)
+            print(f"[{request_id}] Request {i+1}/3 submitted")
+        
+        # Wait for all 3 requests to complete in parallel
+        results = await asyncio.gather(*[h.get() for h in handlers])
+        
+        # Parse results from all 3 requests
+        generated_images = []
+        for idx, result in enumerate(results):
+            if "images" in result and len(result["images"]) > 0:
+                generated_images.append({
+                    "url": result["images"][0].get("url", ""),
+                    "index": idx
+                })
+        
+        print(f"[{request_id}] Collected {len(generated_images)} images from parallel requests")
+        return generated_images
+        
+    else:
+        # BATCH MODE: Single request with num_images=3
+        print(f"[{request_id}] Execution mode: BATCH (single request, 3 images)")
+        
+        arguments = {**base_arguments, "num_images": 3}
+        handler = await fal_client.submit_async(model, arguments=arguments)
+        
+        # Wait for completion
+        async for event in handler.iter_events(with_logs=True):
+            if hasattr(event, 'message'):
+                print(f"[{request_id}] {event.message}")
+        
+        result = await handler.get()
+        
+        # Parse results
+        generated_images = []
+        if "images" in result:
+            for idx, img in enumerate(result["images"]):
+                generated_images.append({
+                    "url": img.get("url", ""),
+                    "index": idx
+                })
+        
+        print(f"[{request_id}] Generated {len(generated_images)} images in batch mode")
+        return generated_images
+
+
+# ============================================================================
 # INPUT & OUTPUT MODELS
 # ============================================================================
 
 class InspirationInput(BaseModel):
     """Input for the inspiration endpoint."""
     inspiration_name: str = Field(
-        description="Name of the inspiration to apply (e.g., 'variations', 'marketplace_pure')",
-        examples=["variations"]
+        description="Name of the inspiration to apply (e.g., 'marketplace_pure', 'creative_color_material')",
+        examples=["marketplace_pure"]
     )
     image_urls: List[str] = Field(
         description="List of input image URLs (1-5 images depending on inspiration)",
-        examples=[["https://example.com/image.jpg"]]
+        examples=[["https://v3b.fal.media/files/b/zebra/shBQJppM86yD1p3nKJxS2.jpg"]]
     )
     aspect_ratio: Optional[Literal["21:9", "1:1", "4:3", "3:2", "2:3", "5:4", "4:5", "3:4", "16:9", "9:16"]] = Field(
         default=None,
@@ -152,7 +309,7 @@ class InspirationInput(BaseModel):
     extra_prompt: Optional[str] = Field(
         default=None,
         description="Optional extra instructions to append to the base prompt",
-        examples=["with vibrant colors and dramatic lighting"]
+        examples=["make the image more vibrant and dramatic, with different camera angles"]
     )
 
 
@@ -173,6 +330,8 @@ class InspirationOutput(BaseModel):
         default=None,
         description="Aspect ratio used for generation"
     )
+    execution_mode: str = Field(description="Execution mode used (parallel or batch)")
+    model: str = Field(description="Model used for generation")
     processing_time: float = Field(description="Time taken in seconds")
     request_id: str = Field(description="Unique request ID")
     error: Optional[str] = Field(default=None, description="Error message if failed")
@@ -217,6 +376,10 @@ class StockInspirations(fal.App):
         - extra_prompt: (optional) Extra instructions
         
         You get back 3 generated images.
+        
+        Execution modes:
+        - PARALLEL: 3 separate requests for maximum diversity (variations, angles, close-ups)
+        - BATCH: Single request with 3 images for consistent results (backgrounds, styles)
         """
         request_id = str(uuid.uuid4())[:8]
         start_time = time.time()
@@ -249,55 +412,35 @@ class StockInspirations(fal.App):
             prompt = build_prompt(input.inspiration_name, input.extra_prompt)
             print(f"[{request_id}] Prompt: {prompt}")
             
-            # Call FAL Nano Banana model
-            import fal_client
+            # Get execution strategy from inspiration config
+            execution_mode = inspiration.get("execution_mode", "batch")
+            model = inspiration.get("model", "fal-ai/nano-banana/edit")
             
-            print(f"[{request_id}] Calling fal-ai/nano-banana/edit...")
+            print(f"[{request_id}] Model: {model}")
+            print(f"[{request_id}] Strategy: {execution_mode.upper()}")
             
-            # Build arguments
-            arguments = {
-                "prompt": prompt,
-                "image_urls": input.image_urls,
-                "num_images": 3,  # Always 3 images
-                "output_format": "png",
-                "limit_generations": True
-            }
-            
-            # Add aspect_ratio only if provided
-            if input.aspect_ratio:
-                arguments["aspect_ratio"] = input.aspect_ratio
-            
-            handler = await fal_client.submit_async(
-                "fal-ai/nano-banana/edit",
-                arguments=arguments
+            # Execute generation using the configured strategy
+            generated_images = await execute_generation(
+                model=model,
+                prompt=prompt,
+                image_urls=input.image_urls,
+                aspect_ratio=input.aspect_ratio,
+                execution_mode=execution_mode,
+                request_id=request_id
             )
-            
-            # Wait for completion
-            async for event in handler.iter_events(with_logs=True):
-                if hasattr(event, 'message'):
-                    print(f"[{request_id}] {event.message}")
-            
-            result = await handler.get()
-            
-            # Parse results
-            generated_images = []
-            if "images" in result:
-                for idx, img in enumerate(result["images"]):
-                    generated_images.append(GeneratedImage(
-                        url=img.get("url", ""),
-                        index=idx
-                    ))
             
             processing_time = time.time() - start_time
             print(f"[{request_id}] Success! Generated {len(generated_images)} images in {processing_time:.2f}s")
             
             return InspirationOutput(
                 success=True,
-                images=generated_images,
+                images=[GeneratedImage(**img) for img in generated_images],
                 inspiration_name=input.inspiration_name,
                 prompt_used=prompt,
                 input_image_count=len(input.image_urls),
                 aspect_ratio=input.aspect_ratio,
+                execution_mode=execution_mode,
+                model=model,
                 processing_time=processing_time,
                 request_id=request_id,
                 error=None
@@ -315,6 +458,8 @@ class StockInspirations(fal.App):
                 prompt_used="",
                 input_image_count=len(input.image_urls),
                 aspect_ratio=input.aspect_ratio,
+                execution_mode="unknown",
+                model="unknown",
                 processing_time=processing_time,
                 request_id=request_id,
                 error=error_msg
@@ -332,6 +477,11 @@ if __name__ == "__main__":
     print("Available Inspirations:")
     for name in list_inspirations():
         inspiration = get_inspiration(name)
-        print(f"  • {name}: {inspiration['description']}")
-    print()
+        mode = inspiration.get('execution_mode', 'batch').upper()
+        model = inspiration.get('model', 'unknown')
+        print(f"  • {name}")
+        print(f"    Category: {inspiration.get('category', 'N/A')}")
+        print(f"    Mode: {mode} | Model: {model}")
+        print(f"    {inspiration['description']}")
+        print()
     print("Deploy with: fal deploy stock_inspirations_app.py")
